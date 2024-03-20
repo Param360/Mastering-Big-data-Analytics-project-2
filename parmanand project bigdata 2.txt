@@ -1,0 +1,99 @@
+# Import necessary libraries
+from pyspark.sql import SparkSession
+from pyspark.ml.feature import VectorAssembler
+from pyspark.ml.classification import DecisionTreeClassifier, RandomForestClassifier, GBTClassifier
+from pyspark.ml import Pipeline
+from pyspark.ml.evaluation import MulticlassClassificationEvaluator
+from pyspark.sql.functions import col
+import matplotlib.pyplot as plt
+
+# Create Spark Session
+spark = SparkSession.builder 
+    .appName(Churn Prediction) 
+    .getOrCreate()
+
+# Load data files from HDFS
+churn_df = spark.read.csv(hdfspath_to_Churn.csv, header=True, inferSchema=True)
+churntest_df = spark.read.csv(hdfspath_to_Churntest.csv, header=True, inferSchema=True)
+
+# Display the data in Spark Dataframe
+print(Churn Data)
+churn_df.show()
+
+# Data pre-processing - Convert categorical variables to integers
+churn_df = churn_df.withColumn(VMail.Plan, col(VMail.Plan).cast(int))
+churn_df = churn_df.withColumn(Int.l.Plan, col(Int.l.Plan).cast(int))
+
+# Exploratory data analysis
+# Describe the data
+print(Descriptive Statistics)
+churn_df.describe().show()
+
+# Create Histogram for Day minutes spent by customers for churn=0 and 1 values
+churn_df.select(Day.Mins, Churn).toPandas().hist(by=Churn, bins=20)
+plt.show()
+
+# Create count plots for Number of customers opt voicemail plan with Churn values
+churn_df.groupBy(VMail.Plan, Churn).count().show()
+
+# Create count plots for International Plan opt by the customer with Churn values
+churn_df.groupBy(Int.l.Plan, Churn).count().show()
+
+# Plot Area Wise churner and non-churner
+churn_df.groupBy(State, Churn).count().show()
+
+# Get correlation matrix
+print(Correlation Matrix)
+correlation_matrix = churn_df.select([col(c).cast(float) for c in churn_df.columns]).toPandas().corr()
+print(correlation_matrix)
+
+# Get correlation between Predicting Variable and independent variable
+print(Correlation between Churn and other variables)
+print(correlation_matrix[Churn])
+
+# Machine Learning Model
+# Create vectors of all independent variables
+feature_columns = churn_df.columns[-1]
+assembler = VectorAssembler(inputCols=feature_columns, outputCol=features)
+churn_df = assembler.transform(churn_df)
+
+# Apply Decision Tree Classifier
+dt = DecisionTreeClassifier(featuresCol=features, labelCol=Churn, maxDepth=5)
+dt_model = dt.fit(churn_df)
+
+# Create a pipeline
+pipeline = Pipeline(stages=[assembler, dt])
+
+# Split the data into train and test dataset
+train_data, test_data = churn_df.randomSplit([0.7, 0.3])
+
+# Make predictions and validate model
+predictions = dt_model.transform(test_data)
+evaluator = MulticlassClassificationEvaluator(labelCol=Churn, predictionCol=prediction, metricName=accuracy)
+accuracy = evaluator.evaluate(predictions)
+print(Decision Tree Classifier Accuracy, accuracy)
+
+# Calculate recall and precision score
+recall = evaluator.evaluate(predictions, {evaluator.metricName weightedRecall})
+precision = evaluator.evaluate(predictions, {evaluator.metricName weightedPrecision})
+print(Decision Tree Classifier Recall, recall)
+print(Decision Tree Classifier Precision, precision)
+
+# Repeat steps for Random Forest Classifier
+rf = RandomForestClassifier(featuresCol=features, labelCol=Churn, numTrees=10)
+rf_model = rf.fit(churn_df)
+pipeline_rf = Pipeline(stages=[assembler, rf])
+predictions_rf = rf_model.transform(test_data)
+accuracy_rf = evaluator.evaluate(predictions_rf)
+print(Random Forest Classifier Accuracy, accuracy_rf)
+
+# Repeat steps for Gradient-Boost Classifier
+gbt = GBTClassifier(featuresCol=features, labelCol=Churn, maxIter=10)
+gbt_model = gbt.fit(churn_df)
+pipeline_gbt = Pipeline(stages=[assembler, gbt])
+predictions_gbt = gbt_model.transform(test_data)
+accuracy_gbt = evaluator.evaluate(predictions_gbt)
+print(Gradient-Boost Classifier Accuracy, accuracy_gbt)
+
+# Stop Spark Session
+spark.stop()
